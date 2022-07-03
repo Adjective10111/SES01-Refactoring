@@ -47,6 +47,44 @@ public class Student {
         return name;
     }
 
+    public boolean passed(Course course) {
+        for (var termEntry : transcript.entrySet()) {
+            var courseScoreMap = termEntry.getValue();
+            var foundCourse = courseScoreMap.get(course);
+            if (foundCourse == null)
+                break;
+            else if (foundCourse >= 10)
+                return true;
+        }
+        return false;
+    }
+
+    public double gpa() {
+        double score = 0;
+        int totalUnits = 0;
+
+        for (var termEntry : transcript.entrySet()) {
+            var courseScoreMap = termEntry.getValue();
+            for (var courseEntry : courseScoreMap.entrySet()) {
+                int units = courseEntry.getKey().getUnits();
+                totalUnits += units;
+                score += units * courseEntry.getValue();
+            }
+        }
+
+        return score / totalUnits;
+    }
+
+    public int getAllowedUnits() {
+        var gpaVal = gpa();
+        if (gpaVal < 12)
+            return 14;
+        else if (gpaVal < 16)
+            return 16;
+        else
+            return 20;
+    }
+
     static class CourseSection {
         Course course;
         int section;

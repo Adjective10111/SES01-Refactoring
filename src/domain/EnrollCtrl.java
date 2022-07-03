@@ -6,51 +6,56 @@ import java.util.List;
 import java.util.Map;
 
 public class EnrollCtrl {
-    public void enroll(Student s, List<CSE> courses) throws EnrollmentRulesViolationException {
-        Map<Term, Map<Course, Double>> transcript = s.getTranscript();
-        for (CSE o : courses) {
-            for (Map.Entry<Term, Map<Course, Double>> tr : transcript.entrySet()) {
-                for (Map.Entry<Course, Double> r : tr.getValue().entrySet()) {
-                    if (r.getKey().equals(o.getCourse()) && r.getValue() >= 10)
-                        throw new EnrollmentRulesViolationException(String.format("The student has already passed %s", o.getCourse().getName()));
-                }
-            }
-            List<Course> prereqs = o.getCourse().getPrerequisites();
-            nextPre:
-            for (Course pre : prereqs) {
-                for (Map.Entry<Term, Map<Course, Double>> tr : transcript.entrySet()) {
-                    for (Map.Entry<Course, Double> r : tr.getValue().entrySet()) {
-                        if (r.getKey().equals(pre) && r.getValue() >= 10)
-                            continue nextPre;
-                    }
-                }
-                throw new EnrollmentRulesViolationException(String.format("The student has not passed %s as a prerequisite of %s", pre.getName(), o.getCourse().getName()));
-            }
-            for (CSE o2 : courses) {
-                if (o == o2)
+    // check if it is passed or has unsatisfied prerequisites
+    private void checkCourse(Student student, Course course) throws EnrollmentRulesViolationException {
+        if (student.passed(course))
+            throw new EnrollmentRulesViolationException
+                    (String.format("The student has already passed %s", course.getName()));
+        for (var prereq : course.prerequisites) {
+            if (!student.passed(prereq))
+                throw new EnrollmentRulesViolationException
+                        (String.format("The student has not passed %s as a prerequisite of %s",
+                                prereq.getName(), course.getName()));
+        }
+    }
+
+    // check if exam time has collision with another course or if there are duplicates
+    private void checkCollision(List<CSE> courses) throws EnrollmentRulesViolationException {
+        for (CSE cse : courses) {
+            for (var cse2 : courses) {
+                if (cse == cse2)
                     continue;
-                if (o.getExamTime().equals(o2.getExamTime()))
-                    throw new EnrollmentRulesViolationException(String.format("Two offerings %s and %s have the same exam time", o, o2));
-                if (o.getCourse().equals(o2.getCourse()))
-                    throw new EnrollmentRulesViolationException(String.format("%s is requested to be taken twice", o.getCourse().getName()));
+                if (cse.getExamTime().equals(cse2.getExamTime()))
+                    throw new EnrollmentRulesViolationException
+                            (String.format("Two offerings %s and %s have the same exam time", cse, cse2));
+                if (cse.getCourse().equals(cse2.getCourse()))
+                    throw new EnrollmentRulesViolationException
+                            (String.format("%s is requested to be taken twice", cse.getCourse().getName()));
             }
         }
+    }
+
+    private int getRequestedUnits(List<CSE> courses) {
         int unitsRequested = 0;
         for (CSE o : courses)
             unitsRequested += o.getCourse().getUnits();
-        double points = 0;
-        int totalUnits = 0;
-        for (Map.Entry<Term, Map<Course, Double>> tr : transcript.entrySet()) {
-            for (Map.Entry<Course, Double> r : tr.getValue().entrySet()) {
-                points += r.getValue() * r.getKey().getUnits();
-                totalUnits += r.getKey().getUnits();
-            }
+        return unitsRequested;
+    }
+
+    public void enroll(Student s, List<CSE> courses) throws EnrollmentRulesViolationException {
+        for (CSE cse : courses) {
+            checkCourse(s, cse.getCourse());
         }
-        double gpa = points / totalUnits;
-        if ((gpa < 12 && unitsRequested > 14) ||
-                (gpa < 16 && unitsRequested > 16) ||
-                (unitsRequested > 20))
-            throw new EnrollmentRulesViolationException(String.format("Number of units (%d) requested does not match GPA of %f", unitsRequested, gpa));
+        checkCollision(courses);
+
+        // check unit taking limit based on gpa
+        int unitsRequested = getRequestedUnits(courses);
+        int allowedUnits = s.getAllowedUnits();
+        if (allowedUnits < unitsRequested)
+            throw new EnrollmentRulesViolationException
+                    (String.format("Number of units (%d) requested does not match GPA of %f", unitsRequested, s.gpa()));
+
+        // take the courses if no exception was thrown
         for (CSE o : courses)
             s.takeCourse(o.getCourse(), o.getSection());
     }
