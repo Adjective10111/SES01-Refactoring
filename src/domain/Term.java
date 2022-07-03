@@ -11,11 +11,6 @@ public class Term {
         this.startDate = null;
     }
 
-    public Term(String name, Date startDate) {
-        this.name = name;
-        this.startDate = startDate;
-    }
-
     public String getName() {
         return name;
     }
